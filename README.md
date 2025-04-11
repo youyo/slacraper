@@ -84,6 +84,19 @@ slacraper --channel general --time-range "2 weeks"  # 過去2週間のメッセ�
 slacraper --channel general --user user_name --text-contains "検索キーワード" --reaction thumbsup --include-url
 ```
 
+## 必要な Slack Bot のパーミッション
+
+このツールを使用するには、Slack Bot に以下のパーミッション（スコープ）が必要です：
+
+- `channels:read` - パブリックチャンネルの一覧取得
+- `groups:read` - プライベートチャンネルの一覧取得
+- `users:read` - ユーザー情報の取得
+- `channels:history` - パブリックチャンネルのメッセージ履歴取得
+- `groups:history` - プライベートチャンネルのメッセージ履歴取得
+- `team:read` - ワークスペース情報の取得（メッセージ URL の生成に使用）
+
+これらのパーミッションは、Slack API の[アプリ管理画面](https://api.slack.com/apps)で設定できます。
+
 ## オプション
 
 - `--channel`: (必須) メッセージを取得するチャンネル名
