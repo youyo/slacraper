@@ -24,6 +24,9 @@ dependencies = [
 ]
 dynamic = ["version"]
 
+[project.scripts]
+slacraper = "slacraper.cli:main"
+
 [tool.setuptools.package-dir]
 slacraper = "src/slacraper"
 
