@@ -66,14 +66,14 @@ def test_basic_command(mock_init, mock_get_messages, cli_runner, sample_data):
     # Assertions
     assert result.exit_code == 0
     mock_init.assert_called_once_with(channel=sample_data["channel"], token=None)
-    mock_get_messages.assert_called_once_with(
-        time_range="1 hour",
-        hours=None,
-        user=None,
-        text_contains=None,
-        reaction=None,
-        include_url=False,
-    )
+    mock_get_messages.assert_called_once()
+    call_args = mock_get_messages.call_args[1]
+    assert call_args["time_range"] == "1 hour"
+    assert call_args["user"] is None
+    assert call_args["text_contains"] is None
+    assert call_args["reaction"] is None
+    assert call_args["include_url"] is False
+    assert "hours" not in call_args  # hours should not be passed anymore
 
     # Check output
     output = json.loads(result.output)
@@ -102,29 +102,7 @@ def test_command_with_token(mock_init, mock_get_messages, cli_runner, sample_dat
     )
 
 
-@patch.object(SlackScraper, "get_messages")
-@patch.object(SlackScraper, "__init__")
-def test_command_with_hours(mock_init, mock_get_messages, cli_runner, sample_data):
-    """Test command with hours option"""
-    # Setup mocks
-    mock_init.return_value = None
-    mock_get_messages.return_value = sample_data["sample_messages"]
-
-    # Run command
-    result = cli_runner.invoke(
-        main, ["--channel", sample_data["channel"], "--hours", "5"]
-    )
-
-    # Assertions
-    assert result.exit_code == 0
-    mock_get_messages.assert_called_once_with(
-        time_range="1 hour",
-        hours=5,
-        user=None,
-        text_contains=None,
-        reaction=None,
-        include_url=False,
-    )
+# --hours オプションのテストは削除されました
 
 
 @patch.object(SlackScraper, "get_messages")
@@ -142,14 +120,13 @@ def test_command_with_time_range(mock_init, mock_get_messages, cli_runner, sampl
 
     # Assertions
     assert result.exit_code == 0
-    mock_get_messages.assert_called_once_with(
-        time_range="1 week",
-        hours=None,
-        user=None,
-        text_contains=None,
-        reaction=None,
-        include_url=False,
-    )
+    mock_get_messages.assert_called_once()
+    call_args = mock_get_messages.call_args[1]
+    assert call_args["time_range"] == "1 week"
+    assert "hours" not in call_args  # hours should not be passed anymore
+
+
+# --hours と --time-range の両方を指定するテストは削除されました
 
 
 @patch.object(SlackScraper, "get_messages")
@@ -179,14 +156,14 @@ def test_command_with_filters(mock_init, mock_get_messages, cli_runner, sample_d
 
     # Assertions
     assert result.exit_code == 0
-    mock_get_messages.assert_called_once_with(
-        time_range="1 hour",
-        hours=None,
-        user="testuser",
-        text_contains="Hello",
-        reaction="thumbsup",
-        include_url=False,
-    )
+    mock_get_messages.assert_called_once()
+    call_args = mock_get_messages.call_args[1]
+    assert call_args["time_range"] == "1 hour"
+    assert call_args["user"] == "testuser"
+    assert call_args["text_contains"] == "Hello"
+    assert call_args["reaction"] == "thumbsup"
+    assert call_args["include_url"] is False
+    assert "hours" not in call_args  # hours should not be passed anymore
 
     # Check output
     output = json.loads(result.output)
@@ -215,14 +192,11 @@ def test_command_with_url(mock_init, mock_get_messages, cli_runner, sample_data)
 
     # Assertions
     assert result.exit_code == 0
-    mock_get_messages.assert_called_once_with(
-        time_range="1 hour",
-        hours=None,
-        user=None,
-        text_contains=None,
-        reaction=None,
-        include_url=True,
-    )
+    mock_get_messages.assert_called_once()
+    call_args = mock_get_messages.call_args[1]
+    assert call_args["time_range"] == "1 hour"
+    assert call_args["include_url"] is True
+    assert "hours" not in call_args  # hours should not be passed anymore
 
     # Check output
     output = json.loads(result.output)

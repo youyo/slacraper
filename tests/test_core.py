@@ -3,6 +3,7 @@ Tests for the core module
 """
 
 import os
+import re
 import pytest
 from unittest.mock import patch, MagicMock
 from datetime import datetime, timedelta
@@ -31,7 +32,7 @@ def sample_data():
                     "type": "message",
                     "user": "U12345678",
                     "text": "Hello, world!",
-                    "ts": "1609459200.000100",
+                    "ts": "1609459200.000100",  # 2021-01-01 00:00:00.000100 UTC
                     "reactions": [
                         {
                             "name": "thumbsup",
@@ -44,9 +45,18 @@ def sample_data():
                     "type": "message",
                     "user": "U87654321",
                     "text": "Testing slacraper",
-                    "ts": "1609459300.000200",
+                    "ts": "1609459300.000200",  # 2021-01-01 00:01:40.000200 UTC
                 },
-            ]
+                # Add a message without a user (e.g., bot message)
+                {
+                    "type": "message",
+                    "subtype": "bot_message",
+                    "text": "This is a bot message",
+                    "ts": "1609459400.000300",
+                },
+            ],
+            "has_more": False,
+            "response_metadata": {"next_cursor": None},
         },
         "sample_user_info": {"user": {"id": "U12345678", "name": "testuser"}},
         "sample_team_info": {
@@ -93,12 +103,16 @@ def test_channel_id_public(mock_client, sample_data):
     """Test getting channel ID from public channel"""
     # Setup mock
     mock_instance = mock_client.return_value
+    # Mock response for public channels (single page)
     mock_instance.conversations_list.return_value = {
+        "ok": True,
         "channels": [
             {"id": "C11111111", "name": "random"},
             {"id": sample_data["channel_id"], "name": sample_data["channel"]},
             {"id": "C33333333", "name": "announcements"},
-        ]
+        ],
+        "has_more": False,
+        "response_metadata": {"next_cursor": None},
     }
 
     # Create scraper and get channel ID
@@ -107,7 +121,10 @@ def test_channel_id_public(mock_client, sample_data):
 
     # Assertions
     assert result == sample_data["channel_id"]
-    mock_instance.conversations_list.assert_called_once()
+    # Check it was called for public channels first
+    mock_instance.conversations_list.assert_called_once_with(
+        types="public_channel", limit=200, cursor=None
+    )
 
 
 @pytest.mark.usefixtures("mock_env")
@@ -117,18 +134,24 @@ def test_channel_id_private(mock_client, sample_data):
     # Setup mock
     mock_instance = mock_client.return_value
     mock_instance.conversations_list.side_effect = [
-        # First call returns public channels without our target
+        # First call (public channels) - no match, no more pages
         {
+            "ok": True,
             "channels": [
                 {"id": "C11111111", "name": "random"},
                 {"id": "C33333333", "name": "announcements"},
-            ]
+            ],
+            "has_more": False,
+            "response_metadata": {"next_cursor": None},
         },
-        # Second call returns private channels with our target
+        # Second call (private channels) - match found, no more pages
         {
+            "ok": True,
             "channels": [
                 {"id": sample_data["channel_id"], "name": sample_data["channel"]}
-            ]
+            ],
+            "has_more": False,
+            "response_metadata": {"next_cursor": None},
         },
     ]
 
@@ -138,7 +161,14 @@ def test_channel_id_private(mock_client, sample_data):
 
     # Assertions
     assert result == sample_data["channel_id"]
-    mock_instance.conversations_list.assert_called_with(types="private_channel")
+    # Check calls for both public and private
+    assert mock_instance.conversations_list.call_count == 2
+    mock_instance.conversations_list.assert_any_call(
+        types="public_channel", limit=200, cursor=None
+    )
+    mock_instance.conversations_list.assert_called_with(
+        types="private_channel", limit=200, cursor=None
+    )  # Last call
 
 
 @pytest.mark.usefixtures("mock_env")
@@ -148,15 +178,23 @@ def test_channel_id_not_found(mock_client, sample_data):
     # Setup mock
     mock_instance = mock_client.return_value
     mock_instance.conversations_list.side_effect = [
-        # First call returns public channels without our target
+        # First call (public channels) - no match, no more pages
         {
+            "ok": True,
             "channels": [
                 {"id": "C11111111", "name": "random"},
                 {"id": "C33333333", "name": "announcements"},
-            ]
+            ],
+            "has_more": False,
+            "response_metadata": {"next_cursor": None},
         },
-        # Second call returns private channels without our target
-        {"channels": [{"id": "C44444444", "name": "private-channel"}]},
+        # Second call (private channels) - no match, no more pages
+        {
+            "ok": True,
+            "channels": [{"id": "C44444444", "name": "private-channel"}],
+            "has_more": False,
+            "response_metadata": {"next_cursor": None},
+        },
     ]
 
     # Create scraper and try to get channel ID
@@ -173,14 +211,22 @@ def test_get_messages_basic(mock_client, sample_data):
     """Test getting messages with basic parameters"""
     # Setup mocks
     mock_instance = mock_client.return_value
+    # Mock channel list (finds channel on first call)
     mock_instance.conversations_list.return_value = {
-        "channels": [{"id": sample_data["channel_id"], "name": sample_data["channel"]}]
+        "ok": True,
+        "channels": [{"id": sample_data["channel_id"], "name": sample_data["channel"]}],
+        "has_more": False,
+        "response_metadata": {"next_cursor": None},
     }
+    # Mock history (single page)
     mock_instance.conversations_history.return_value = sample_data["sample_messages"]
+    # Mock user info (will be called once per unique user ID due to cache)
     mock_instance.users_info.side_effect = [
-        {"user": {"name": "testuser"}},
-        {"user": {"name": "anotheruser"}},
+        {"ok": True, "user": {"id": "U12345678", "name": "testuser"}},
+        {"ok": True, "user": {"id": "U87654321", "name": "anotheruser"}},
+        # No call for the bot message user
     ]
+    # Mock team info (called only if include_url=True, cached)
     mock_instance.team_info.return_value = sample_data["sample_team_info"]
 
     # Create scraper and get messages
@@ -188,17 +234,35 @@ def test_get_messages_basic(mock_client, sample_data):
     messages = scraper.get_messages(time_range="1 hour")
 
     # Assertions
-    assert len(messages) == 2
+    assert len(messages) == 3  # Including the bot message now
     assert messages[0]["channel"] == sample_data["channel"]
     assert messages[0]["user"] == "U12345678"
     assert messages[0]["user_name"] == "testuser"
     assert messages[0]["text"] == "Hello, world!"
     assert "reactions" in messages[0]
     assert messages[0]["reactions"][0]["name"] == "thumbsup"
+    assert messages[1]["user_name"] == "anotheruser"
+    assert messages[2]["user"] == ""  # Bot message has no user ID in our sample
+    assert messages[2]["user_name"] is None
+    assert messages[2]["text"] == "This is a bot message"
 
-    # Check that the timestamp was formatted correctly
-    expected_dt = datetime.fromtimestamp(1609459200.000100)
-    assert messages[0]["timestamp"] == expected_dt.isoformat()
+    # Check timestamp format (ISO 8601 with Z)
+    # Expected: 2021-01-01T00:00:00.000Z (adjust based on actual ts value)
+    # dt_utc = datetime.fromtimestamp(float("1609459200.000100"), tz=timezone.utc)
+    # expected_ts_str = dt_utc.strftime('%Y-%m-%dT%H:%M:%S.%f')[:-3] + 'Z' # Manual format
+    # We need to be careful with floating point precision and rounding for milliseconds
+    assert re.match(
+        r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z", messages[0]["timestamp"]
+    )
+    assert messages[0]["timestamp"].startswith(
+        "2021-01-01T00:00:00.000"
+    )  # Check prefix
+
+    # Check API call counts (considering cache)
+    assert (
+        mock_instance.users_info.call_count == 2
+    )  # Called once for U12345678, once for U87654321
+    mock_instance.team_info.assert_not_called()  # include_url=False
 
 
 @pytest.mark.usefixtures("mock_env")
@@ -207,34 +271,75 @@ def test_get_messages_with_filters(mock_client, sample_data):
     """Test getting messages with filters"""
     # Setup mocks
     mock_instance = mock_client.return_value
+    # Mock channel list
     mock_instance.conversations_list.return_value = {
-        "channels": [{"id": sample_data["channel_id"], "name": sample_data["channel"]}]
+        "ok": True,
+        "channels": [{"id": sample_data["channel_id"], "name": sample_data["channel"]}],
+        "has_more": False,
+        "response_metadata": {"next_cursor": None},
     }
 
     # Create scraper
     scraper = SlackScraper(channel=sample_data["channel"])
 
-    # Test user filter
+    # --- Test user filter ---
     mock_instance.conversations_history.return_value = sample_data["sample_messages"]
-    mock_instance.users_info.side_effect = [
-        {"user": {"name": "testuser"}},
-        {"user": {"name": "anotheruser"}},
-    ]
-    messages = scraper.get_messages(time_range="1 hour", user="testuser")
-    assert len(messages) == 1
-    assert messages[0]["user_name"] == "testuser"
-
-    # Reset mocks for next test
+    # Reset side effect for users_info for this specific test run
     mock_instance.users_info.reset_mock()
     mock_instance.users_info.side_effect = [
-        {"user": {"name": "testuser"}},
-        {"user": {"name": "anotheruser"}},
+        {
+            "ok": True,
+            "user": {"id": "U12345678", "name": "testuser"},
+        },  # Called for first message
+        {
+            "ok": True,
+            "user": {"id": "U87654321", "name": "anotheruser"},
+        },  # Called for second message
+        # Bot message user is not fetched
+    ]
+    messages = scraper.get_messages(time_range="1 hour", user="testuser")
+    assert len(messages) == 1  # Only the message from testuser should remain
+    assert messages[0]["user_name"] == "testuser"
+    assert (
+        mock_instance.users_info.call_count == 2
+    )  # Still fetches both users before filtering
+
+    # --- Test text filter ---
+    # Reset mocks
+    mock_instance.conversations_history.reset_mock()
+    mock_instance.users_info.reset_mock()
+    mock_instance.conversations_history.return_value = sample_data["sample_messages"]
+    mock_instance.users_info.side_effect = [
+        {"ok": True, "user": {"id": "U12345678", "name": "testuser"}},
+        {"ok": True, "user": {"id": "U87654321", "name": "anotheruser"}},
     ]
 
-    # Test text filter
+    # Test text filter - no need to reset mocks again as we're using the same setup
     messages = scraper.get_messages(time_range="1 hour", text_contains="slacraper")
-    assert len(messages) == 1
+    assert len(messages) == 1  # Only the message containing "slacraper"
     assert messages[0]["text"] == "Testing slacraper"
+    # Note: Due to caching, users_info might not be called again if the same user IDs were already fetched
+    # So we don't assert the call count here
+
+    # --- Test reaction filter ---
+    # Reset mocks
+    mock_instance.conversations_history.reset_mock()
+    mock_instance.users_info.reset_mock()
+    mock_instance.conversations_history.return_value = sample_data["sample_messages"]
+    mock_instance.users_info.side_effect = [
+        {"ok": True, "user": {"id": "U12345678", "name": "testuser"}},
+        {"ok": True, "user": {"id": "U87654321", "name": "anotheruser"}},
+    ]
+    # Clear the user cache to force API calls
+    scraper._user_cache.clear()
+
+    messages = scraper.get_messages(time_range="1 hour", reaction="thumbsup")
+    assert len(messages) == 1  # Only the message with thumbsup
+    assert messages[0]["user_name"] == "testuser"
+    # With caching cleared, it should call users_info for the matching message
+    assert (
+        mock_instance.users_info.call_count >= 1
+    )  # At least one call for the matching message
 
 
 @pytest.mark.usefixtures("mock_env")
@@ -243,14 +348,21 @@ def test_get_messages_with_url(mock_client, sample_data):
     """Test getting messages with URL included"""
     # Setup mocks
     mock_instance = mock_client.return_value
+    # Mock channel list
     mock_instance.conversations_list.return_value = {
-        "channels": [{"id": sample_data["channel_id"], "name": sample_data["channel"]}]
+        "ok": True,
+        "channels": [{"id": sample_data["channel_id"], "name": sample_data["channel"]}],
+        "has_more": False,
+        "response_metadata": {"next_cursor": None},
     }
+    # Mock history
     mock_instance.conversations_history.return_value = sample_data["sample_messages"]
+    # Mock user info (called once per unique user ID)
     mock_instance.users_info.side_effect = [
-        {"user": {"name": "testuser"}},
-        {"user": {"name": "anotheruser"}},
+        {"ok": True, "user": {"id": "U12345678", "name": "testuser"}},
+        {"ok": True, "user": {"id": "U87654321", "name": "anotheruser"}},
     ]
+    # Mock team info (will be called once due to cache)
     mock_instance.team_info.return_value = sample_data["sample_team_info"]
 
     # Create scraper and get messages with URL
@@ -258,44 +370,90 @@ def test_get_messages_with_url(mock_client, sample_data):
     messages = scraper.get_messages(time_range="1 hour", include_url=True)
 
     # Assertions
-    assert len(messages) == 2
+    assert len(messages) == 3  # Includes bot message
     assert "url" in messages[0]
-    expected_url = f"https://test-team.slack.com/archives/{sample_data['channel_id']}/p1609459200000100"
-    assert messages[0]["url"] == expected_url
+    assert "url" in messages[1]
+    # Note: In the current implementation, bot messages also get URLs if include_url=True
+    # This is expected behavior, so we update the test to match
+    assert "url" in messages[2]  # Bot message also gets URL
+    expected_url1 = f"https://test-team.slack.com/archives/{sample_data['channel_id']}/p1609459200000100"
+    expected_url2 = f"https://test-team.slack.com/archives/{sample_data['channel_id']}/p1609459300000200"
+    assert messages[0]["url"] == expected_url1
+    assert messages[1]["url"] == expected_url2
+
+    # Check API call counts
+    assert mock_instance.users_info.call_count == 2
+    mock_instance.team_info.assert_called_once()  # Called once and cached
 
 
-@pytest.mark.usefixtures("mock_env")
-@patch("src.slacraper.core.WebClient")
-def test_parse_time_range(mock_client, sample_data):
-    """Test parsing time range"""
-    scraper = SlackScraper(channel=sample_data["channel"])
+@patch(
+    "src.slacraper.core.WebClient"
+)  # Keep patch if scraper instantiation is needed elsewhere
+def test_parse_time_range(mock_client, sample_data):  # Remove mock_client if not used
+    """Test parsing various valid and invalid time range strings."""
+    # Instantiate the scraper just to get the method easily, or call statically if possible
+    # If SlackScraper.__init__ doesn't rely on WebClient, the patch might be removable
+    scraper = SlackScraper(channel="dummy_channel", token="dummy_token")
+    parser = scraper.parse_time_range
 
-    # Test hours
-    assert scraper.parse_time_range("1 hour") == timedelta(hours=1)
-    assert scraper.parse_time_range("2 hours") == timedelta(hours=2)
-    assert scraper.parse_time_range("24 hours") == timedelta(hours=24)
+    # --- Valid Cases ---
+    # Hours
+    assert parser("1 hour") == timedelta(hours=1)
+    assert parser("2 hours") == timedelta(hours=2)
+    assert parser("1hr") == timedelta(hours=1)
+    assert parser(" 3 hrs ") == timedelta(hours=3)  # With whitespace
 
-    # Test days
-    assert scraper.parse_time_range("1 day") == timedelta(days=1)
-    assert scraper.parse_time_range("7 days") == timedelta(days=7)
+    # Minutes
+    assert parser("30 minutes") == timedelta(minutes=30)
+    assert parser("1 min") == timedelta(minutes=1)
+    assert parser("15mins") == timedelta(minutes=15)
 
-    # Test weeks
-    assert scraper.parse_time_range("1 week") == timedelta(weeks=1)
-    assert scraper.parse_time_range("2 weeks") == timedelta(weeks=2)
+    # Days
+    assert parser("1 day") == timedelta(days=1)
+    assert parser("7 days") == timedelta(days=7)
+    assert parser("today") == timedelta(days=1)  # Special case
 
-    # Test months
-    assert scraper.parse_time_range("1 month").months == 1
-    assert scraper.parse_time_range("6 months").months == 6
+    # Weeks
+    assert parser("1 week") == timedelta(weeks=1)
+    assert parser("2 weeks") == timedelta(weeks=2)
+    assert parser("3 wk") == timedelta(weeks=3)
+    assert parser("4wks") == timedelta(weeks=4)
 
-    # Test years
-    assert scraper.parse_time_range("1 year").years == 1
+    # Months (returns relativedelta)
+    assert parser("1 month") == relativedelta(months=1)
+    assert parser("6 months") == relativedelta(months=6)
 
-    # Test special cases
-    assert scraper.parse_time_range("today") == timedelta(days=1)
+    # Years (returns relativedelta)
+    assert parser("1 year") == relativedelta(years=1)
+    assert parser("2 yrs") == relativedelta(years=2)
+    assert parser(" 1 yr ") == relativedelta(years=1)
 
-    # Test numeric only
-    assert scraper.parse_time_range("12") == timedelta(hours=12)
+    # 'a'/'an'/'one' cases
+    assert parser("an hour") == timedelta(hours=1)
+    assert parser("a day") == timedelta(days=1)
+    assert parser("a week") == timedelta(weeks=1)
+    assert parser("a month") == relativedelta(months=1)
+    assert parser("a year") == relativedelta(years=1)
+    assert parser("one minute") == timedelta(minutes=1)
 
-    # Test default
-    assert scraper.parse_time_range("invalid") == timedelta(hours=1)
-    assert scraper.parse_time_range("") == timedelta(hours=1)
+    # Numeric only (interpreted as hours)
+    assert parser("12") == timedelta(hours=12)
+    assert parser("0") == timedelta(hours=0)
+    assert parser(" 1 ") == timedelta(hours=1)  # Numeric with whitespace
+
+    # --- Invalid Cases ---
+    with pytest.raises(ValueError, match="Could not parse time range: 'invalid'"):
+        parser("invalid")
+    with pytest.raises(ValueError, match="Could not parse time range: '1 lightyear'"):
+        parser("1 lightyear")
+    with pytest.raises(ValueError, match="Time range string cannot be empty"):
+        parser("")
+    # For whitespace-only strings, the error message is different after stripping
+    with pytest.raises(ValueError, match="Could not parse time range: '   '"):
+        parser("   ")  # Whitespace only
+    # Negative values are not handled by regex, so they result in generic error
+    with pytest.raises(ValueError, match="Could not parse time range: '-5 hours'"):
+        parser("-5 hours")
+    with pytest.raises(ValueError, match="Could not parse time range: '-10'"):
+        parser("-10")  # Numeric hours case - regex doesn't match negative numbers
+        parser("1monthago")

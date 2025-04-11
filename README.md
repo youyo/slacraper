@@ -75,9 +75,6 @@ slacraper --channel general
 
 # トークンを直接指定する場合
 slacraper --channel general --token xoxb-your-token
-# 過去2時間のメッセージを取得（従来の方法、互換性のため残されています）
-slacraper --channel general --hours 2
-
 # 時間範囲を自然言語で指定する場合
 slacraper --channel general --time-range "1 day"  # 過去1日のメッセージを取得
 slacraper --channel general --time-range "1 week"  # 過去1週間のメッセージを取得
@@ -92,7 +89,6 @@ slacraper --channel general --user user_name --text-contains "検索キーワー
 - `--channel`: (必須) メッセージを取得するチャンネル名
 - `--token`: Slack Bot Token（環境変数 `SLACK_BOT_TOKEN` が設定されていない場合は必須）
 - `--time-range`: 時間範囲を自然言語で指定（例: "1 hour", "2 days", "1 week", "1 month"）（デフォルト: "1 hour"）
-- `--hours`: (非推奨) 何時間前までのメッセージを取得するか
 - `--user`: 特定のユーザーのメッセージのみを取得
 - `--text-contains`: 特定のテキストを含むメッセージのみを取得
 - `--reaction`: 特定のリアクション（スタンプ）が付与されたメッセージのみを取得

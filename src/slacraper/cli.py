@@ -6,7 +6,8 @@ import os
 import sys
 import json
 import click
-from typing import Optional
+import warnings
+from typing import Optional, Union
 
 from .core import SlackScraper
 
@@ -19,17 +20,12 @@ from .core import SlackScraper
 )
 @click.option(
     "--token",
-    help="Slack Bot Token. If not provided, it will be read from SLACK_BOT_TOKEN environment variable",
+    help="Slack Bot Token. Overrides SLACK_BOT_TOKEN environment variable if provided.",
 )
 @click.option(
     "--time-range",
     default="1 hour",
-    help="Time range to look back for messages (e.g., '1 hour', '2 days', '1 week', default: '1 hour')",
-)
-@click.option(
-    "--hours",
-    type=int,
-    help="(Deprecated) Number of hours to look back for messages",
+    help="Time range to look back (e.g., '1 hour', '2 days', '1 week', '30 minutes'). Default: '1 hour'.",
 )
 @click.option(
     "--user",
@@ -52,7 +48,6 @@ def main(
     channel: str,
     token: Optional[str],
     time_range: str,
-    hours: Optional[int],
     user: Optional[str],
     text_contains: Optional[str],
     reaction: Optional[str],
@@ -61,14 +56,18 @@ def main(
     """
     Scrape messages from a Slack channel
     """
+    # Use time_range directly
+    final_time_range: Union[str, float] = time_range
+
     try:
         # Initialize the scraper
+        # Token precedence: --token > SLACK_BOT_TOKEN
         scraper = SlackScraper(channel=channel, token=token)
 
-        # Get messages
+        # Get messages using the determined time range
         messages = scraper.get_messages(
-            time_range=time_range,  # 常にtime_rangeを使用
-            hours=hours,  # hoursも明示的に渡す
+            time_range=final_time_range,  # Use the processed time range
+            # No need to pass hours anymore as core handles the logic via time_range
             user=user,
             text_contains=text_contains,
             reaction=reaction,
