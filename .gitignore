@@ -1,0 +1,7 @@
+#
+.venv/
+.direnv/
+tmp/
+.envrc
+.pytest_cache/
+__pycache__/

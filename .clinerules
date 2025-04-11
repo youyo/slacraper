@@ -1,0 +1,265 @@
+# LLM向け最適化.clinerules
+
+## 1. 基本ルール
+
+- ユーザーはRooより高いプログラミングスキルを持つが、時間効率化のためにRooにコーディングを依頼している
+- 連続して2回以上テストが失敗した場合は、試行錯誤を続けるのではなく、状況を整理して共同で解決策を検討する
+- GitHubから学習した広範な知識を活用し、テストコードを書きながら動作確認し、説明しながらコードを実装する
+- コンテキスト依存の処理は苦手なため、不明確な場合はユーザーに確認する
+- 常に日本語で応答する
+- Memory Bankを適宜更新し、タスク完了前には必ず更新する
+- `cd`コマンドは使用しない
+
+## 2. Python開発規約
+
+### 2.1 ライブラリ構造
+Pythonライブラリ開発には`src-layout`を使用する：
+
+```
+project_root_directory
+├── pyproject.toml
+├── setup.py
+└── src/
+    └── mypkg/
+        ├── __init__.py
+        ├── module.py
+        └── subpkg1/
+            ├── __init__.py
+            └── module1.py
+```
+
+### 2.2 設定ファイル例
+
+#### pyproject.toml
+```toml
+[build-system]
+requires = ["setuptools>=42", "wheel", "setuptools_scm[toml]>=6.2"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "project_root_directory"
+description = "AWS Security Group Mapping Tool"
+readme = "README.md"
+license = {file = "LICENSE"}
+classifiers = [
+    "Programming Language :: Python :: 3.12",
+]
+requires-python = ">=3.12.0"
+dependencies = [
+    "boto3>=1.20.0",
+    "click>=8.0.0",
+]
+dynamic = ["version"]
+
+[tools.setuptools.package-dir]
+project_root_directory = "src/project_root_directory"
+
+[tool.setuptools_scm]
+write_to = "src/project_root_directory/_version.py"
+```
+
+#### setup.py
+```python
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+
+from setuptools import setup, find_packages
+
+setup(
+    name="project_root_directory",
+    use_scm_version=True,
+    description="AWS Security Group Mapping Tool",
+    author="youyo",
+    packages=find_packages(where="src"),
+    package_dir={"": "src"},
+    install_requires=[
+        "boto3>=1.20.0",
+        "click>=8.0.0",
+    ],
+    python_requires=">=3.12.0",
+    entry_points={
+        "console_scripts": [
+            "project_root_directory=project_root_directory.cli:main",
+        ],
+    },
+    setup_requires=["setuptools_scm>=6.2"],
+)
+```
+
+#### GitHub Actions (publish.yaml)
+```yaml
+name: Publish python package
+
+on:
+  push:
+    branches-ignore:
+      - "**"
+    tags:
+      - "v*"
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.12"
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install --upgrade build setuptools setuptools_scm
+      - name: Build package
+        run: |
+          python -m build
+      - name: Publish package distributions to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
+```
+
+## 3. メモリーバンクシステム
+
+### 3.1 概要
+Rooはセッション間で記憶がリセットされるため、メモリーバンクに完全に依存している。すべてのタスク開始時に全メモリーバンクファイルを読む必要がある。
+
+### 3.2 ファイル構造
+```mermaid
+flowchart TD
+    PB[projectbrief.md] --> PC[productContext.md]
+    PB --> SP[systemPatterns.md]
+    PB --> TC[techContext.md]
+    
+    PC --> AC[activeContext.md]
+    SP --> AC
+    TC --> AC
+    
+    AC --> P[progress.md]
+```
+
+### 3.3 コアファイル（必須）
+
+1. **projectbrief.md**
+   - 基盤となる文書
+   - コア要件と目標を定義
+   - プロジェクト範囲の信頼できる情報源
+
+2. **productContext.md**
+   - プロジェクトの存在理由
+   - 解決する問題
+   - 機能要件
+   - ユーザー体験の目標
+
+3. **activeContext.md**
+   - 現在の作業の焦点
+   - 最近の変更
+   - 次のステップ
+   - アクティブな決定事項
+
+4. **systemPatterns.md**
+   - システムアーキテクチャ
+   - 重要な技術的決定
+   - 設計パターン
+   - コンポーネント関係
+
+5. **techContext.md**
+   - 使用技術
+   - 開発環境設定
+   - 技術的制約
+   - 依存関係
+
+6. **progress.md**
+   - 機能している部分
+   - 残りの作業
+   - 現在の状態
+   - 既知の問題
+
+### 3.4 追加コンテキスト
+必要に応じて`memory-bank/`内に追加ファイル/フォルダを作成：
+- 複雑な機能のドキュメント
+- 統合仕様
+- APIドキュメント
+- テスト戦略
+- デプロイ手順
+
+### 3.5 ワークフロー
+
+#### 計画モード
+```mermaid
+flowchart TD
+    Start[開始] --> ReadFiles[メモリーバンクを読む]
+    ReadFiles --> CheckFiles{ファイルは完全か？}
+    
+    CheckFiles -->|いいえ| Plan[計画を作成]
+    Plan --> Document[チャットで文書化]
+    
+    CheckFiles -->|はい| Verify[コンテキストを確認]
+    Verify --> Strategy[戦略を開発]
+    Strategy --> Present[アプローチを提示]
+```
+
+#### 実行モード
+```mermaid
+flowchart TD
+    Start[開始] --> Context[メモリーバンクを確認]
+    Context --> Update[ドキュメントを更新]
+    Update --> Rules[必要に応じて.clinerulesを更新]
+    Rules --> Execute[タスクを実行]
+    Execute --> Document[変更を文書化]
+```
+
+### 3.6 更新タイミング
+メモリーバンクの更新は以下の場合に実施：
+1. 新しいプロジェクトパターンの発見時
+2. 重要な変更の実装後
+3. ユーザーが**update memory bank**と要求した場合
+4. コンテキストの明確化が必要な場合
+
+```mermaid
+flowchart TD
+    Start[更新プロセス]
+    
+    subgraph Process
+        P1[すべてのファイルを確認]
+        P2[現在の状態を文書化]
+        P3[次のステップを明確化]
+        P4[.clinerulesを更新]
+        
+        P1 --> P2 --> P3 --> P4
+    end
+    
+    Start --> Process
+```
+
+### 3.7 プロジェクトインテリジェンス
+.clinerulesファイルはプロジェクトの学習ジャーナルとして機能：
+
+```mermaid
+flowchart TD
+    Start{新しいパターンの発見}
+    
+    subgraph Learn [学習プロセス]
+        D1[パターンを特定]
+        D2[ユーザーと検証]
+        D3[.clinerulesに文書化]
+    end
+    
+    subgraph Apply [使用法]
+        A1[.clinerulesを読む]
+        A2[学習したパターンを適用]
+        A3[将来の作業を改善]
+    end
+    
+    Start --> Learn
+    Learn --> Apply
+```
+
+#### 記録すべき内容
+- 重要な実装パス
+- ユーザーの設定とワークフロー
+- プロジェクト固有のパターン
+- 既知の課題
+- プロジェクト決定の進化
+- ツール使用パターン
