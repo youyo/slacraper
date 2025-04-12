@@ -14,7 +14,7 @@ from functools import lru_cache
 import warnings  # warnings モジュールをインポート
 
 
-class SlackScraper:
+class Slacraper:
     """
     Slack message scraper class
     """
@@ -25,7 +25,7 @@ class SlackScraper:
         token: Optional[str] = None,
     ):
         """
-        Initialize the SlackScraper
+        Initialize the Slacraper
 
         Args:
             channel: Slack channel name to scrape messages from

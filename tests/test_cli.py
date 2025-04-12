@@ -9,7 +9,7 @@ from unittest.mock import patch, MagicMock
 from click.testing import CliRunner
 
 from src.slacraper.cli import main
-from src.slacraper.core import SlackScraper
+from src.slacraper.core import Slacraper
 
 
 @pytest.fixture
@@ -52,8 +52,8 @@ def sample_data():
     return {"channel": channel, "token": token, "sample_messages": sample_messages}
 
 
-@patch.object(SlackScraper, "get_messages")
-@patch.object(SlackScraper, "__init__")
+@patch.object(Slacraper, "get_messages")
+@patch.object(Slacraper, "__init__")
 def test_basic_command(mock_init, mock_get_messages, cli_runner, sample_data):
     """Test basic command with required options"""
     # Setup mocks
@@ -82,8 +82,8 @@ def test_basic_command(mock_init, mock_get_messages, cli_runner, sample_data):
     assert output[1]["text"] == "Testing slacraper"
 
 
-@patch.object(SlackScraper, "get_messages")
-@patch.object(SlackScraper, "__init__")
+@patch.object(Slacraper, "get_messages")
+@patch.object(Slacraper, "__init__")
 def test_command_with_token(mock_init, mock_get_messages, cli_runner, sample_data):
     """Test command with token option"""
     # Setup mocks
@@ -105,8 +105,8 @@ def test_command_with_token(mock_init, mock_get_messages, cli_runner, sample_dat
 # --hours オプションのテストは削除されました
 
 
-@patch.object(SlackScraper, "get_messages")
-@patch.object(SlackScraper, "__init__")
+@patch.object(Slacraper, "get_messages")
+@patch.object(Slacraper, "__init__")
 def test_command_with_time_range(mock_init, mock_get_messages, cli_runner, sample_data):
     """Test command with time-range option"""
     # Setup mocks
@@ -129,8 +129,8 @@ def test_command_with_time_range(mock_init, mock_get_messages, cli_runner, sampl
 # --hours と --time-range の両方を指定するテストは削除されました
 
 
-@patch.object(SlackScraper, "get_messages")
-@patch.object(SlackScraper, "__init__")
+@patch.object(Slacraper, "get_messages")
+@patch.object(Slacraper, "__init__")
 def test_command_with_filters(mock_init, mock_get_messages, cli_runner, sample_data):
     """Test command with filter options"""
     # Setup mocks
@@ -171,8 +171,8 @@ def test_command_with_filters(mock_init, mock_get_messages, cli_runner, sample_d
     assert output[0]["user_name"] == "testuser"
 
 
-@patch.object(SlackScraper, "get_messages")
-@patch.object(SlackScraper, "__init__")
+@patch.object(Slacraper, "get_messages")
+@patch.object(Slacraper, "__init__")
 def test_command_with_url(mock_init, mock_get_messages, cli_runner, sample_data):
     """Test command with include-url option"""
     # Setup mocks
@@ -204,7 +204,7 @@ def test_command_with_url(mock_init, mock_get_messages, cli_runner, sample_data)
     assert "url" in output[0]
 
 
-@patch.object(SlackScraper, "__init__")
+@patch.object(Slacraper, "__init__")
 def test_missing_channel(mock_init, cli_runner):
     """Test command without required channel option"""
     # Run command
@@ -215,7 +215,7 @@ def test_missing_channel(mock_init, cli_runner):
     assert "Missing option '--channel'" in result.output
 
 
-@patch.object(SlackScraper, "__init__")
+@patch.object(Slacraper, "__init__")
 def test_initialization_error(mock_init, cli_runner, sample_data):
     """Test error handling when initialization fails"""
     # Setup mock to raise an error

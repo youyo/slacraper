@@ -7,13 +7,13 @@ slacraper は、以下のコンポーネントで構成されています：
 ```
 slacraper/
 ├── __init__.py  # パッケージ初期化とバージョン情報
-├── core.py      # コア機能を提供する SlackScraper クラス
+├── core.py      # コア機能を提供する Slacraper クラス
 └── cli.py       # コマンドラインインターフェース
 ```
 
 ### コンポーネント概要
 
-1. **SlackScraper クラス** (core.py)
+1. **Slacraper クラス** (core.py)
 
    - Slack API との通信を担当
    - メッセージの取得とフィルタリングを実装
@@ -25,7 +25,7 @@ slacraper/
 2. **CLI インターフェース** (cli.py)
    - コマンドラインオプションの解析
    - 環境変数からのトークン読み取り
-   - SlackScraper クラスの呼び出し
+   - Slacraper クラスの呼び出し
    - エラーハンドリングと適切なエラーメッセージ
    - 結果の JSON 出力
 
@@ -64,13 +64,13 @@ slacraper/
 
 1. **シングルレスポンシビリティ原則**
 
-   - SlackScraper クラスは Slack からのメッセージ取得に特化
+   - Slacraper クラスは Slack からのメッセージ取得に特化
    - CLI インターフェースはユーザー入力の処理と出力に特化
    - 各メソッドは単一の責任を持つように設計
 
 2. **ファサードパターン**
 
-   - SlackScraper クラスは Slack API の複雑さを隠蔽し、シンプルなインターフェースを提供
+   - Slacraper クラスは Slack API の複雑さを隠蔽し、シンプルなインターフェースを提供
    - 複雑な API 呼び出しを抽象化し、使いやすいメソッドを提供
 
 3. **依存性注入**
@@ -96,13 +96,13 @@ slacraper/
 graph TD
     User[ユーザー] --> CLI[CLI インターフェース]
     User --> Library[ライブラリ API]
-    CLI --> SlackScraper[SlackScraper クラス]
-    Library --> SlackScraper
-    SlackScraper --> WebClient[Slack WebClient]
+    CLI --> Slacraper[Slacraper クラス]
+    Library --> Slacraper
+    Slacraper --> WebClient[Slack WebClient]
     WebClient --> SlackAPI[Slack API]
-    SlackScraper --> ChannelResolver[チャンネル ID 解決]
-    SlackScraper --> MessageFilter[メッセージフィルタリング]
-    SlackScraper --> URLGenerator[URL 生成]
+    Slacraper --> ChannelResolver[チャンネル ID 解決]
+    Slacraper --> MessageFilter[メッセージフィルタリング]
+    Slacraper --> URLGenerator[URL 生成]
 ```
 
 ### データフロー
@@ -110,12 +110,12 @@ graph TD
 1. **ライブラリ使用時**:
 
    ```
-   ユーザーコード -> SlackScraper -> チャンネル ID 解決 -> Slack API -> メッセージデータ取得 -> ユーザー情報取得 -> フィルタリング -> URL 生成（オプション） -> 構造化データ -> ユーザーコード
+   ユーザーコード -> Slacraper -> チャンネル ID 解決 -> Slack API -> メッセージデータ取得 -> ユーザー情報取得 -> フィルタリング -> URL 生成（オプション） -> 構造化データ -> ユーザーコード
    ```
 
 2. **CLI 使用時**:
    ```
-   コマンドライン入力 -> オプション解析 -> 環境変数確認 -> SlackScraper -> チャンネル ID 解決 -> Slack API -> メッセージデータ取得 -> ユーザー情報取得 -> フィルタリング -> URL 生成（オプション） -> 構造化データ -> JSON 出力
+   コマンドライン入力 -> オプション解析 -> 環境変数確認 -> Slacraper -> チャンネル ID 解決 -> Slack API -> メッセージデータ取得 -> ユーザー情報取得 -> フィルタリング -> URL 生成（オプション） -> 構造化データ -> JSON 出力
    ```
 
 ## エラーハンドリング戦略

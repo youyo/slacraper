@@ -2,9 +2,9 @@
 slacraper - Slack message scraper tool
 """
 
-from .core import SlackScraper
+from .core import Slacraper
 
-__all__ = ["SlackScraper"]
+__all__ = ["Slacraper"]
 
 try:
     from ._version import version as __version__

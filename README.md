@@ -39,14 +39,14 @@ uvx src/slacraper/cli.py --channel general
 ### ライブラリとして
 
 ```python
-from slacraper import SlackScraper
+from slacraper import Slacraper
 
 # 環境変数 SLACK_BOT_TOKEN が設定されている場合
-scraper = SlackScraper(channel="general")
+scraper = Slacraper(channel="general")
 messages = scraper.get_messages()
 print(messages)
 # トークンを直接指定する場合
-scraper = SlackScraper(channel="general", token="xoxb-your-token")
+scraper = Slacraper(channel="general", token="xoxb-your-token")
 
 # 時間範囲を指定する場合（数値で指定）
 messages = scraper.get_messages(time_range=2)  # 過去2時間のメッセージを取得

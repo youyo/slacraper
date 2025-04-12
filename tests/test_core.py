@@ -9,7 +9,7 @@ from unittest.mock import patch, MagicMock
 from datetime import datetime, timedelta
 from dateutil.relativedelta import relativedelta
 
-from src.slacraper.core import SlackScraper
+from src.slacraper.core import Slacraper
 
 
 @pytest.fixture
@@ -69,7 +69,7 @@ def sample_data():
 @patch("src.slacraper.core.WebClient")
 def test_init_with_token_param(mock_client, sample_data):
     """Test initialization with token parameter"""
-    scraper = SlackScraper(channel=sample_data["channel"], token=sample_data["token"])
+    scraper = Slacraper(channel=sample_data["channel"], token=sample_data["token"])
 
     assert scraper.channel == sample_data["channel"]
     assert scraper.token == sample_data["token"]
@@ -80,7 +80,7 @@ def test_init_with_token_param(mock_client, sample_data):
 @patch("src.slacraper.core.WebClient")
 def test_init_with_env_token(mock_client, sample_data):
     """Test initialization with environment variable token"""
-    scraper = SlackScraper(channel=sample_data["channel"])
+    scraper = Slacraper(channel=sample_data["channel"])
 
     assert scraper.channel == sample_data["channel"]
     assert scraper.token == "xoxb-test-token"
@@ -98,7 +98,7 @@ def test_init_without_token(mock_client, sample_data):
     """Test initialization without token"""
     # No environment variable, no token parameter
     with pytest.raises(ValueError) as excinfo:
-        SlackScraper(channel=sample_data["channel"])
+        Slacraper(channel=sample_data["channel"])
 
     assert "Slack Bot Token is required" in str(excinfo.value)
 
@@ -122,7 +122,7 @@ def test_channel_id_public(mock_client, sample_data):
     }
 
     # Create scraper and get channel ID
-    scraper = SlackScraper(channel=sample_data["channel"])
+    scraper = Slacraper(channel=sample_data["channel"])
     result = scraper.channel_id
 
     # Assertions
@@ -162,7 +162,7 @@ def test_channel_id_private(mock_client, sample_data):
     ]
 
     # Create scraper and get channel ID
-    scraper = SlackScraper(channel=sample_data["channel"])
+    scraper = Slacraper(channel=sample_data["channel"])
     result = scraper.channel_id
 
     # Assertions
@@ -204,7 +204,7 @@ def test_channel_id_not_found(mock_client, sample_data):
     ]
 
     # Create scraper and try to get channel ID
-    scraper = SlackScraper(channel=sample_data["channel"])
+    scraper = Slacraper(channel=sample_data["channel"])
     with pytest.raises(ValueError) as excinfo:
         _ = scraper.channel_id
 
@@ -236,7 +236,7 @@ def test_get_messages_basic(mock_client, sample_data):
     mock_instance.team_info.return_value = sample_data["sample_team_info"]
 
     # Create scraper and get messages
-    scraper = SlackScraper(channel=sample_data["channel"])
+    scraper = Slacraper(channel=sample_data["channel"])
     messages = scraper.get_messages(time_range="1 hour")
 
     # Assertions
@@ -286,7 +286,7 @@ def test_get_messages_with_filters(mock_client, sample_data):
     }
 
     # Create scraper
-    scraper = SlackScraper(channel=sample_data["channel"])
+    scraper = Slacraper(channel=sample_data["channel"])
 
     # --- Test user filter ---
     mock_instance.conversations_history.return_value = sample_data["sample_messages"]
@@ -372,7 +372,7 @@ def test_get_messages_with_url(mock_client, sample_data):
     mock_instance.team_info.return_value = sample_data["sample_team_info"]
 
     # Create scraper and get messages with URL
-    scraper = SlackScraper(channel=sample_data["channel"])
+    scraper = Slacraper(channel=sample_data["channel"])
     messages = scraper.get_messages(time_range="1 hour", include_url=True)
 
     # Assertions
@@ -398,8 +398,8 @@ def test_get_messages_with_url(mock_client, sample_data):
 def test_parse_time_range(mock_client, sample_data):  # Remove mock_client if not used
     """Test parsing various valid and invalid time range strings."""
     # Instantiate the scraper just to get the method easily, or call statically if possible
-    # If SlackScraper.__init__ doesn't rely on WebClient, the patch might be removable
-    scraper = SlackScraper(channel="dummy_channel", token="dummy_token")
+    # If Slacraper.__init__ doesn't rely on WebClient, the patch might be removable
+    scraper = Slacraper(channel="dummy_channel", token="dummy_token")
     parser = scraper.parse_time_range
 
     # --- Valid Cases ---

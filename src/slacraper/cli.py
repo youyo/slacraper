@@ -9,7 +9,7 @@ import click
 import warnings
 from typing import Optional, Union
 
-from .core import SlackScraper
+from .core import Slacraper
 
 
 @click.command()
@@ -61,7 +61,7 @@ def main(
     try:
         # Initialize the scraper
         # Token precedence: --token > SLACK_BOT_TOKEN
-        scraper = SlackScraper(channel=channel, token=token)
+        scraper = Slacraper(channel=channel, token=token)
 
         # Get messages using the determined time range
         messages = scraper.get_messages(

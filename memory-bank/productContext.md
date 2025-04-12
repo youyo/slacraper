@@ -134,11 +134,11 @@ Slack は多くの組織やチームで使用されているコミュニケー�
 
    ```python
    # 毎日のチーム活動を記録
-   from slacraper import SlackScraper
+   from slacraper import Slacraper
    import json
    import datetime
 
-   scraper = SlackScraper(channel="team-updates")
+   scraper = Slacraper(channel="team-updates")
    messages = scraper.get_messages(hours=24)
 
    # 日付ごとにファイルに保存
@@ -158,9 +158,9 @@ Slack は多くの組織やチームで使用されているコミュニケー�
 
    ```python
    # 特定のリアクションが付いたメッセージを分析
-   from slacraper import SlackScraper
+   from slacraper import Slacraper
 
-   scraper = SlackScraper(channel="ideas")
+   scraper = Slacraper(channel="ideas")
    popular_ideas = scraper.get_messages(
        hours=168,  # 過去1週間
        reaction="thumbsup",
