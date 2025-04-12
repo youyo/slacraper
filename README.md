@@ -1,5 +1,9 @@
 # slacraper
 
+[![PyPI version](https://badge.fury.io/py/slacraper.svg)](https://pypi.org/project/slacraper/)
+[![Run Tests](https://github.com/youyo/slacraper/actions/workflows/test.yaml/badge.svg)](https://github.com/youyo/slacraper/actions/workflows/test.yaml)
+[![Publish python package](https://github.com/youyo/slacraper/actions/workflows/publish.yaml/badge.svg)](https://github.com/youyo/slacraper/actions/workflows/publish.yaml)
+
 Slack のメッセージを取得するためのツールです。ライブラリとしての利用を基本としますが、CLI としても利用できます。
 
 ## インストール
