@@ -56,8 +56,7 @@ def main(
     """
     Scrape messages from a Slack channel
     """
-    # Use time_range directly
-    final_time_range: Union[str, float] = time_range
+    # final_time_range 変数は不要なので削除
 
     try:
         # Initialize the scraper
@@ -66,8 +65,8 @@ def main(
 
         # Get messages using the determined time range
         messages = scraper.get_messages(
-            time_range=final_time_range,  # Use the processed time range
-            # No need to pass hours anymore as core handles the logic via time_range
+            time_range=time_range,  # 直接 time_range を渡す
+            # core.py が time_range 文字列または数値を処理する
             user=user,
             text_contains=text_contains,
             reaction=reaction,

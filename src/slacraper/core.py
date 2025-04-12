@@ -11,6 +11,7 @@ from dateutil.relativedelta import relativedelta
 from slack_sdk import WebClient
 from slack_sdk.errors import SlackApiError
 from functools import lru_cache
+import warnings  # warnings モジュールをインポート
 
 
 class SlackScraper:
@@ -68,10 +69,11 @@ class SlackScraper:
                     # Ensure 'channels' key exists and is a list
                     channels_list = response.get("channels", [])
                     if not isinstance(channels_list, list):
-                        print(
-                            f"Warning: Unexpected format for 'channels' in {channel_type} list response."
+                        warnings.warn(
+                            f"Unexpected format for 'channels' in {channel_type} list response.",
+                            UserWarning,
                         )
-                        break  # Stop if format is wrong
+                        continue  # Continue to next channel type if format is wrong
 
                     for channel_info in channels_list:
                         # Ensure channel_info is a dict and has 'name' and 'id'
@@ -95,10 +97,11 @@ class SlackScraper:
                     # If missing scopes for a type, log a warning and try the next type.
                     # Other errors should be raised.
                     if e.response and e.response.get("error") == "missing_scope":
-                        print(
-                            f"Warning: Missing scope to list {channel_type}s. Ensure the bot token has necessary permissions (e.g., channels:read, groups:read). Error: {e}"
+                        warnings.warn(
+                            f"Missing scope to list {channel_type}s. Ensure the bot token has necessary permissions (e.g., channels:read, groups:read). Error: {e}",
+                            UserWarning,
                         )
-                        break  # Move to the next channel type
+                        break  # Move to the next channel type if scope is missing for this type
                     # Raise other Slack API errors, including original exception for context
                     raise ValueError(f"Error listing {channel_type}s: {e}") from e
                 except Exception as e:
@@ -141,16 +144,20 @@ class SlackScraper:
                 raise ValueError("Time range in hours cannot be negative.")
             return datetime.timedelta(hours=hours_val)
 
-        # Simplified regex matching for "number unit" format
-        match = re.match(r"(\d+)\s*(\w+)", time_range_norm)
+        # Regex matching for "number unit" format with specific units and end anchor
+        match = re.match(
+            r"(\d+)\s*(hours?|hr|hrs|minutes?|min|mins|days?|weeks?|wk|wks|months?|years?|yr|yrs)$",
+            time_range_norm,
+        )
         if match:
             value = int(match.group(1))
-            unit = match.group(2)  # Already lowercase due to time_range_norm
+            unit = match.group(2)
 
-            # Ensure non-negative value for all units
-            if value < 0:
-                raise ValueError("Time range value cannot be negative.")
+            # Ensure non-negative value (already handled by \d+, but good practice)
+            # if value < 0:
+            #     raise ValueError("Time range value cannot be negative.")
 
+            # Use startswith for flexibility with plurals, but unit is now guaranteed to be valid
             if unit.startswith("hour") or unit in ["hr", "hrs"]:
                 return datetime.timedelta(hours=value)
             elif unit.startswith("minute") or unit in ["min", "mins"]:
@@ -163,8 +170,7 @@ class SlackScraper:
                 return relativedelta(months=value)
             elif unit.startswith("year") or unit in ["yr", "yrs"]:
                 return relativedelta(years=value)
-            # Note: No explicit handling for singular units like 'hour' here
-            # as they are covered by startswith or the 'a'/'one' checks below.
+            # This part should theoretically not be reached if regex is correct
 
         # Handle 'a'/'an'/'one' and singular unit cases explicitly
         # time_range_norm is already normalized
@@ -200,15 +206,17 @@ class SlackScraper:
                     return user_name
                 else:
                     # User object exists but name is missing/empty
-                    print(
-                        f"Warning: User ID {user_id} found but 'name' key is missing or empty in user_info response."
+                    warnings.warn(
+                        f"User ID {user_id} found but 'name' key is missing or empty in user_info response.",
+                        UserWarning,
                     )
                     self._user_cache[user_id] = None  # Cache as None if name is missing
                     return None
             else:
                 # Unexpected response structure
-                print(
-                    f"Warning: Unexpected structure for 'user' object in users_info response for {user_id}."
+                warnings.warn(
+                    f"Unexpected structure for 'user' object in users_info response for {user_id}.",
+                    UserWarning,
                 )
                 self._user_cache[user_id] = None  # Cache failure
                 return None
@@ -220,19 +228,25 @@ class SlackScraper:
                 # Don't print a warning for users not found, just cache None
                 pass
             elif error_type == "missing_scope":
-                print(
-                    f"Warning: Missing 'users:read' scope to fetch user info for {user_id}. Error: {e}"
+                warnings.warn(
+                    f"Missing 'users:read' scope to fetch user info for {user_id}. Error: {e}",
+                    UserWarning,
                 )
             else:
                 # Log other unexpected API errors
-                print(f"Warning: Slack API error fetching user info for {user_id}: {e}")
+                warnings.warn(
+                    f"Slack API error fetching user info for {user_id}: {e}",
+                    UserWarning,
+                )
 
             # Cache failure regardless of the specific API error
             self._user_cache[user_id] = None
             return None
         except Exception as e:
             # Catch any other unexpected errors during the process
-            print(f"Unexpected error fetching user name for {user_id}: {e}")
+            warnings.warn(
+                f"Unexpected error fetching user name for {user_id}: {e}", UserWarning
+            )
             self._user_cache[user_id] = None  # Cache failure
             return None
 
@@ -262,8 +276,9 @@ class SlackScraper:
                 )
                 # Validate response structure before proceeding
                 if not isinstance(response.get("messages"), list):
-                    print(
-                        f"Warning: Page {page_count}: 'messages' key missing or not a list in conversations.history response. Response: {response}"
+                    warnings.warn(
+                        f"Page {page_count}: 'messages' key missing or not a list in conversations.history response. Response: {response}",
+                        UserWarning,
                     )
                     break  # Stop pagination if response format is invalid
 
@@ -273,15 +288,17 @@ class SlackScraper:
                     if isinstance(msg, dict):
                         yield msg
                     else:
-                        print(
-                            f"Warning: Page {page_count}: Skipping non-dictionary item in messages list: {msg}"
+                        warnings.warn(
+                            f"Page {page_count}: Skipping non-dictionary item in messages list: {msg}",
+                            UserWarning,
                         )
 
                 # Check for pagination metadata safely
                 metadata = response.get("response_metadata", {})
                 if not isinstance(metadata, dict):
-                    print(
-                        f"Warning: Page {page_count}: 'response_metadata' is not a dictionary. Stopping pagination."
+                    warnings.warn(
+                        f"Page {page_count}: 'response_metadata' is not a dictionary. Stopping pagination.",
+                        UserWarning,
                     )
                     break
 
@@ -296,8 +313,9 @@ class SlackScraper:
                 error_type = e.response.get("error") if e.response else "unknown_error"
                 if error_type == "ratelimited":
                     # Basic rate limit handling (could implement backoff)
-                    print(
-                        f"Warning: Page {page_count}: Rate limited fetching messages. Consider adding delays or reducing frequency. Error: {e}"
+                    warnings.warn(
+                        f"Page {page_count}: Rate limited fetching messages. Consider adding delays or reducing frequency. Error: {e}",
+                        UserWarning,
                     )
                     # Depending on strategy, could break, sleep, or re-raise
                     # For now, re-raise as ValueError to signal failure
@@ -409,7 +427,9 @@ class SlackScraper:
             for msg in self._fetch_paginated_messages(oldest_ts):
                 # Basic message validation (ensure it's a dictionary)
                 if not isinstance(msg, dict):
-                    print(f"Warning: Skipping non-dictionary item in messages: {msg}")
+                    warnings.warn(
+                        f"Skipping non-dictionary item in messages: {msg}", UserWarning
+                    )
                     continue
 
                 # Check for essential keys 'text' and 'ts'
@@ -484,7 +504,7 @@ class SlackScraper:
 
         return messages
 
-    # <<< get_messages method removed and replaced below >>>
+    # L487 の不要なコメントを削除
 
     def _format_timestamp(self, ts: str) -> str:
         """
@@ -512,8 +532,9 @@ class SlackScraper:
             return dt_utc.strftime(f"%Y-%m-%dT%H:%M:%S.{milliseconds}Z")
         except (ValueError, TypeError, OverflowError) as e:
             # Handle potential errors during conversion (e.g., invalid format, out of range)
-            print(
-                f"Warning: Could not format timestamp '{ts}'. Error: {e}. Returning original value."
+            warnings.warn(
+                f"Could not format timestamp '{ts}'. Error: {e}. Returning original value.",
+                UserWarning,
             )
             # Ensure the returned value is always a string, even if input wasn't
             return str(ts)
@@ -539,27 +560,31 @@ class SlackScraper:
                     return domain  # Return the found domain
                 else:
                     # Log if the domain key is missing or not a string
-                    print(
-                        "Warning: 'domain' key missing, empty, or not a string in team_info response['team']. Using 'workspace' fallback."
+                    warnings.warn(
+                        "Warning: 'domain' key missing, empty, or not a string in team_info response['team']. Using 'workspace' fallback.",
+                        UserWarning,
                     )
                     return "workspace"  # Fallback
             else:
                 # Log if the 'team' key is missing or not a dictionary
-                print(
-                    "Warning: 'team' key missing or not a dictionary in team_info response. Using 'workspace' fallback."
+                warnings.warn(
+                    "Warning: 'team' key missing or not a dictionary in team_info response. Using 'workspace' fallback.",
+                    UserWarning,
                 )
                 return "workspace"  # Fallback
 
         except SlackApiError as e:
             # Log the API error for debugging purposes
             error_type = e.response.get("error") if e.response else "unknown_error"
-            print(
-                f"Warning: Slack API error ({error_type}) retrieving workspace domain via team_info. Error: {e}. Using 'workspace' fallback."
+            warnings.warn(
+                f"Slack API error ({error_type}) retrieving workspace domain via team_info. Error: {e}. Using 'workspace' fallback.",
+                UserWarning,
             )
             return "workspace"  # Fallback in case of API error
         except Exception as e:
             # Catch any other unexpected errors during the API call or processing
-            print(
-                f"Unexpected error retrieving workspace domain: {e}. Using 'workspace' fallback."
+            warnings.warn(
+                f"Unexpected error retrieving workspace domain: {e}. Using 'workspace' fallback.",
+                UserWarning,
             )
             return "workspace"  # Fallback for other errors

@@ -87,6 +87,12 @@ def test_init_with_env_token(mock_client, sample_data):
     mock_client.assert_called_once_with(token="xoxb-test-token")
 
 
+import os  # Add import for os module used in patch.dict
+
+
+@patch.dict(
+    os.environ, {}, clear=True
+)  # Ensure SLACK_BOT_TOKEN is not set for this test
 @patch("src.slacraper.core.WebClient")
 def test_init_without_token(mock_client, sample_data):
     """Test initialization without token"""
@@ -451,9 +457,12 @@ def test_parse_time_range(mock_client, sample_data):  # Remove mock_client if no
     # For whitespace-only strings, the error message is different after stripping
     with pytest.raises(ValueError, match="Could not parse time range: '   '"):
         parser("   ")  # Whitespace only
-    # Negative values are not handled by regex, so they result in generic error
+    # Negative value with unit doesn't match regex, falls through
     with pytest.raises(ValueError, match="Could not parse time range: '-5 hours'"):
         parser("-5 hours")
+    # Negative numeric string doesn't match isdigit() or the regex, falls through
     with pytest.raises(ValueError, match="Could not parse time range: '-10'"):
-        parser("-10")  # Numeric hours case - regex doesn't match negative numbers
-        parser("1monthago")
+        parser("-10")
+    # Invalid format
+    with pytest.raises(ValueError, match="Could not parse time range: '1monthago'"):
+        parser("1monthago")  # No space
